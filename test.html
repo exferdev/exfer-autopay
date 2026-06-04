@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Exfer AutoPay — Test Panel</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0d1117; color: #e6edf3;
+  min-height: 100vh; padding: 24px;
+}
+h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+.subtitle { font-size: 13px; color: #7d8590; margin-bottom: 24px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: #161b22; border: 1px solid #30363d;
+  border-radius: 10px; padding: 20px;
+}
+.card h2 { font-size: 14px; font-weight: 600; color: #8b949e; text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 16px; }
+
+label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; margin-top: 12px; }
+label:first-of-type { margin-top: 0; }
+input, textarea {
+  width: 100%; background: #0d1117; border: 1px solid #30363d;
+  color: #e6edf3; border-radius: 6px; padding: 8px 10px;
+  font-size: 13px; font-family: inherit; outline: none;
+  transition: border-color .15s;
+}
+input:focus, textarea:focus { border-color: #58a6ff; }
+textarea { resize: vertical; min-height: 60px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 14px; padding: 8px 16px;
+  background: #238636; border: 1px solid #2ea043; color: #fff;
+  border-radius: 6px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.btn:hover { background: #2ea043; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.secondary { background: #21262d; border-color: #30363d; }
+.btn.secondary:hover { background: #30363d; }
+.btn.danger { background: #b91c1c; border-color: #dc2626; }
+
+.result {
+  margin-top: 14px; padding: 10px 12px;
+  background: #0d1117; border: 1px solid #30363d;
+  border-radius: 6px; font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+  white-space: pre-wrap; word-break: break-all; max-height: 280px; overflow-y: auto;
+  line-height: 1.6; color: #7ee787;
+}
+.result.error { color: #ff7b72; border-color: #6e1c1c; }
+
+.status-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.status-pending    { background: rgba(210,153,34,.15);  color: #d2993a; }
+.status-processing { background: rgba(88,166,255,.12);  color: #58a6ff; }
+.status-confirmed  { background: rgba(46,160,67,.15);   color: #2ea043; }
+.status-failed     { background: rgba(248,81,73,.12);   color: #f85149; }
+
+.queue-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px;
+}
+.queue-row:last-child { border-bottom: none; }
+.queue-label { color: #8b949e; }
+.queue-val   { font-weight: 600; font-family: monospace; }
+
+.config-row { display: flex; gap: 8px; align-items: flex-end; }
+.config-row input { flex: 1; }
+
+#log {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  padding: 10px 12px; font-size: 11px; font-family: monospace;
+  height: 160px; overflow-y: auto; color: #7d8590; line-height: 1.7;
+}
+.log-ok   { color: #7ee787; }
+.log-err  { color: #ff7b72; }
+.log-info { color: #58a6ff; }
+
+.spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid transparent; border-top-color: currentColor;
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.history-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid #21262d;
+  font-size: 12px; cursor: pointer;
+}
+.history-item:last-child { border-bottom: none; }
+.history-item:hover { background: rgba(255,255,255,.02); }
+.history-id { font-family: monospace; color: #58a6ff; flex: 1; }
+.history-amt { color: #7ee787; }
+</style>
+</head>
+<body>
+
+<h1>⚡ Exfer AutoPay — Test Panel</h1>
+<p class="subtitle">Local test interface — calls http://127.0.0.1:3888 directly</p>
+
+<div class="grid">
+
+  <!-- ── Configuration ── -->
+  <div class="card">
+    <h2>⚙️ Configuration</h2>
+    <label>API Base URL</label>
+    <input id="baseUrl" value="http://127.0.0.1:3888" />
+    <label>API Key</label>
+    <input id="apiKey" type="password" value="test-local-key-123" />
+    <button class="btn secondary" onclick="checkHealth()">
+      <span id="healthSpin"></span> Check Connection
+    </button>
+    <div id="healthResult" class="result" style="display:none"></div>
+  </div>
+
+  <!-- ── Queue Stats ── -->
+  <div class="card">
+    <h2>📊 Queue Stats</h2>
+    <div id="queueStats">
+      <div class="queue-row"><span class="queue-label">Pending</span><span class="queue-val" id="q-pending">—</span></div>
+      <div class="queue-row"><span class="queue-label">Processing</span><span class="queue-val" id="q-processing">—</span></div>
+      <div class="queue-row"><span class="queue-label">Confirmed</span><span class="queue-val" id="q-confirmed">—</span></div>
+      <div class="queue-row"><span class="queue-label">Failed</span><span class="queue-val" id="q-failed">—</span></div>
+      <div class="queue-row"><span class="queue-label">Wallet Address</span><span class="queue-val" id="q-addr" style="font-size:10px;word-break:break-all">—</span></div>
+    </div>
+    <button class="btn secondary" onclick="refreshHealth()" style="margin-top:12px">🔄 Refresh</button>
+  </div>
+
+  <!-- ── Submit Payment ── -->
+  <div class="card">
+    <h2>💸 Submit Payment</h2>
+    <label>Recipient Address (64-char hex)</label>
+    <input id="payTo" placeholder="a7165f01... (64 chars)" />
+    <label>Amount (EXFER)</label>
+    <input id="payAmount" type="number" step="0.00000001" placeholder="0.001" value="0.001" />
+    <label>Wallet ID (optional)</label>
+    <input id="payWallet" placeholder="main" />
+    <label>Business Ref (optional)</label>
+    <input id="payRef" placeholder="order_001" />
+    <label>Webhook URL (optional)</label>
+    <input id="payWebhook" placeholder="https://your.server/callback" />
+    <button class="btn" onclick="submitPay()">
+      <span id="paySpin"></span> Submit Payment
+    </button>
+    <div id="payResult" class="result" style="display:none"></div>
+  </div>
+
+  <!-- ── Query Status ── -->
+  <div class="card">
+    <h2>🔍 Query Status</h2>
+    <label>Payment ID</label>
+    <div class="config-row">
+      <input id="statusId" placeholder="pay_xxxxxxxxxxxxxxxx" />
+      <button class="btn secondary" onclick="queryStatus()">Query</button>
+    </div>
+    <label>Business Ref</label>
+    <div class="config-row">
+      <input id="refId" placeholder="order_001" />
+      <button class="btn secondary" onclick="queryRef()">Query Ref</button>
+    </div>
+    <div id="statusResult" class="result" style="display:none"></div>
+  </div>
+
+  <!-- ── Session History ── -->
+  <div class="card">
+    <h2>📋 Session History</h2>
+    <div id="history" style="max-height:200px;overflow-y:auto">
+      <p style="font-size:12px;color:#7d8590">No payments yet</p>
+    </div>
+  </div>
+
+  <!-- ── Live Log ── -->
+  <div class="card">
+    <h2>📝 Live Log</h2>
+    <div id="log"></div>
+    <button class="btn secondary" onclick="clearLog()" style="margin-top:8px">Clear</button>
+  </div>
+
+</div>
+
+<!-- ── Batch Test ── -->
+<div class="card" style="margin-top:16px">
+  <h2>🚀 Batch Test — Simulate concurrent payment burst</h2>
+  <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+    <div>
+      <label>Recipient Address</label>
+      <input id="batchTo" placeholder="64-char hex address" style="width:380px" />
+    </div>
+    <div>
+      <label>Amount per payment (EXFER)</label>
+      <input id="batchAmount" type="number" value="0.001" step="0.00000001" style="width:140px" />
+    </div>
+    <div>
+      <label>Count</label>
+      <input id="batchCount" type="number" value="5" min="1" max="200" style="width:80px" />
+    </div>
+    <button class="btn" onclick="runBatch()">
+      <span id="batchSpin"></span> Send Batch
+    </button>
+  </div>
+  <div id="batchResult" class="result" style="display:none;margin-top:12px"></div>
+</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id)
+
+function base() { return $('baseUrl').value.replace(/\/$/, '') }
+function key()  { return $('apiKey').value }
+
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Authorization': `Bearer ${key()}`, 'Content-Type': 'application/json' },
+  }
+  if (body) opts.body = JSON.stringify(body)
+  const res = await fetch(base() + path, opts)
+  const data = await res.json()
+  if (!res.ok) throw Object.assign(new Error(data.error ?? `HTTP ${res.status}`), { data })
+  return data
+}
+
+function log(msg, type = 'info') {
+  const el = $('log')
+  const line = document.createElement('div')
+  line.className = `log-${type}`
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
+  el.appendChild(line)
+  el.scrollTop = el.scrollHeight
+}
+
+function showResult(id, data, isError = false) {
+  const el = $(id)
+  el.style.display = 'block'
+  el.className = `result${isError ? ' error' : ''}`
+  el.textContent = JSON.stringify(data, null, 2)
+}
+
+function spin(id, on) {
+  $(id).innerHTML = on ? '<span class="spinner"></span>' : ''
+}
+
+// History
+const history = []
+function addHistory(payment) {
+  history.unshift(payment)
+  renderHistory()
+}
+function renderHistory() {
+  const el = $('history')
+  if (!history.length) { el.innerHTML = '<p style="font-size:12px;color:#7d8590">No payments yet</p>'; return }
+  el.innerHTML = history.map(p => `
+    <div class="history-item" onclick="loadId('${p.id}')">
+      <span class="history-id">${p.id}</span>
+      <span class="history-amt">${p.amount} EXFER</span>
+      <span class="status-badge status-${p.status}">${p.status}</span>
+    </div>
+  `).join('')
+}
+
+function loadId(id) {
+  $('statusId').value = id
+  queryStatus()
+}
+
+// ── Health check ──────────────────────────────────────────────────────────────
+
+async function checkHealth() {
+  spin('healthSpin', true)
+  try {
+    const data = await api('GET', '/health')
+    showResult('healthResult', data)
+    refreshQueueStats(data)
+    log('Connection OK ✓', 'ok')
+  } catch (e) {
+    showResult('healthResult', { error: e.message }, true)
+    log(`Connection failed: ${e.message}`, 'err')
+  }
+  spin('healthSpin', false)
+}
+
+async function refreshHealth() {
+  try {
+    const data = await api('GET', '/health')
+    refreshQueueStats(data)
+    log('Queue stats refreshed', 'info')
+  } catch (e) {
+    log(`Refresh failed: ${e.message}`, 'err')
+  }
+}
+
+function refreshQueueStats(data) {
+  const q = data.total ?? data.queue
+  if (!q) return
+  $('q-pending').textContent    = q.pending
+  $('q-processing').textContent = q.processing
+  $('q-confirmed').textContent  = q.confirmed
+  $('q-failed').textContent     = q.failed
+  if (data.wallets?.[0]) {
+    $('q-addr').textContent = data.wallets[0].address
+  } else if (data.address) {
+    $('q-addr').textContent = data.address
+  }
+}
+
+// ── Submit payment ────────────────────────────────────────────────────────────
+
+async function submitPay() {
+  const to      = $('payTo').value.trim()
+  const amount  = $('payAmount').value.trim()
+  const wallet  = $('payWallet').value.trim()
+  const ref     = $('payRef').value.trim()
+  const webhook = $('payWebhook').value.trim()
+
+  if (!to || !amount) { log('Recipient address and amount are required', 'err'); return }
+
+  spin('paySpin', true)
+  try {
+    const body = { to, amount }
+    if (wallet)  body.wallet  = wallet
+    if (ref)     body.ref     = ref
+    if (webhook) body.webhook = webhook
+
+    const data = await api('POST', '/pay', body)
+    showResult('payResult', data)
+    log(`Payment submitted: ${data.id} (${amount} EXFER)`, 'ok')
+    addHistory(data)
+    pollStatus(data.id)
+  } catch (e) {
+    showResult('payResult', e.data ?? { error: e.message }, true)
+    log(`Submission failed: ${e.message}`, 'err')
+  }
+  spin('paySpin', false)
+}
+
+// ── Poll status ───────────────────────────────────────────────────────────────
+
+const polling = {}
+
+async function pollStatus(id) {
+  if (polling[id]) return
+  polling[id] = true
+  log(`Polling ${id}...`, 'info')
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 3000))
+    try {
+      const data = await api('GET', `/status/${id}`)
+      const idx = history.findIndex(p => p.id === id)
+      if (idx >= 0) { history[idx].status = data.status; renderHistory() }
+
+      if (data.status === 'confirmed') {
+        log(`✅ ${id} confirmed — txId: ${data.tx_id}  fee: ${data.fee} EXFER`, 'ok')
+        break
+      }
+      if (data.status === 'failed') {
+        log(`❌ ${id} failed: ${data.error}`, 'err')
+        break
+      }
+      log(`⏳ ${id} status: ${data.status} (retries: ${data.retries})`, 'info')
+    } catch (e) {
+      log(`Poll error: ${e.message}`, 'err')
+    }
+  }
+  delete polling[id]
+}
+
+// ── Query status ──────────────────────────────────────────────────────────────
+
+async function queryStatus() {
+  const id = $('statusId').value.trim()
+  if (!id) { log('Please enter a Payment ID', 'err'); return }
+  try {
+    const data = await api('GET', `/status/${id}`)
+    showResult('statusResult', data)
+    log(`Query ${id}: ${data.status}`, 'ok')
+  } catch (e) {
+    showResult('statusResult', { error: e.message }, true)
+    log(`Query failed: ${e.message}`, 'err')
+  }
+}
+
+async function queryRef() {
+  const ref = $('refId').value.trim()
+  if (!ref) { log('Please enter a Ref', 'err'); return }
+  try {
+    const data = await api('GET', `/ref/${encodeURIComponent(ref)}`)
+    showResult('statusResult', data)
+    log(`Ref ${ref}: ${data.count} record(s)`, 'ok')
+  } catch (e) {
+    showResult('statusResult', { error: e.message }, true)
+    log(`Query failed: ${e.message}`, 'err')
+  }
+}
+
+// ── Batch test ────────────────────────────────────────────────────────────────
+
+async function runBatch() {
+  const to     = $('batchTo').value.trim()
+  const amount = $('batchAmount').value.trim()
+  const count  = parseInt($('batchCount').value) || 1
+
+  if (!to || !amount) { log('Batch test: address and amount are required', 'err'); return }
+
+  spin('batchSpin', true)
+  const results = []
+  log(`Submitting ${count} payment(s) concurrently...`, 'info')
+
+  const promises = Array.from({ length: count }, (_, i) =>
+    api('POST', '/pay', { to, amount, ref: `batch_test_${Date.now()}_${i}` })
+      .then(d => { results.push({ ok: true, id: d.id }); addHistory(d); return d })
+      .catch(e => { results.push({ ok: false, error: e.message }); return null })
+  )
+
+  await Promise.all(promises)
+
+  const ok  = results.filter(r => r.ok).length
+  const err = results.filter(r => !r.ok).length
+  showResult('batchResult', {
+    submitted: count,
+    success:   ok,
+    failed:    err,
+    ids:       results.filter(r => r.ok).map(r => r.id),
+  })
+  log(`Batch done: ${ok} accepted, ${err} failed`, ok > 0 ? 'ok' : 'err')
+
+  results.filter(r => r.ok).forEach(r => pollStatus(r.id))
+  spin('batchSpin', false)
+}
+
+// ── Misc ──────────────────────────────────────────────────────────────────────
+
+function clearLog() { $('log').innerHTML = '' }
+
+$('payTo').addEventListener('input', e => {
+  if (!$('batchTo').value) $('batchTo').value = e.target.value
+})
+
+window.addEventListener('load', () => {
+  checkHealth()
+  setInterval(refreshHealth, 10_000)
+})
+</script>
+</body>
+</html>

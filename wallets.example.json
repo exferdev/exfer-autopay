@@ -1,0 +1,18 @@
+[
+  {
+    "id": "main",
+    "comment": "主钱包（默认）",
+    "mnemonic": "word1 word2 word3 ... word24"
+  },
+  {
+    "id": "hot1",
+    "comment": "热钱包 1",
+    "mnemonic": "other word1 word2 ... word24"
+  },
+  {
+    "id": "hot2",
+    "comment": "热钱包 2（key 文件方式）",
+    "keyFile": "/etc/exfer-autopay/hot2.key",
+    "keyPass": "your-passphrase"
+  }
+]

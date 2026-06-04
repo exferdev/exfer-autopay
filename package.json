@@ -1,0 +1,29 @@
+{
+  "name": "exfer-autopay",
+  "version": "1.0.0",
+  "description": "Automatic payment queue service for the Exfer blockchain",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "exfer-js": "file:../exfer-js",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.5.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

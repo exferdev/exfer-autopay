@@ -1,0 +1,28 @@
+[Unit]
+Description=Exfer Auto-Pay Service
+After=network.target
+
+[Service]
+Type=simple
+User=exfer
+WorkingDirectory=/opt/exfer-autopay
+EnvironmentFile=/opt/exfer-autopay/.env
+
+# Use compiled output; or replace with: ExecStart=npx tsx src/index.ts
+ExecStart=/usr/bin/node dist/index.js
+
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/exfer-autopay/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=exfer-autopay
+
+[Install]
+WantedBy=multi-user.target
